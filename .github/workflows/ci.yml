@@ -1,0 +1,15 @@
+# OBJETIVO:
+# Definir el flujo de integración continua del proyecto.
+#
+# FUNCIONES PREVISTAS:
+# - Ejecutar comprobaciones ante cambios en el repositorio.
+# - Instalar las dependencias del proyecto.
+# - Ejecutar las pruebas automatizadas disponibles.
+# - Informar si las comprobaciones finalizan correctamente o fallan.
+#
+# CONSIDERACIONES:
+# La configuración ejecutable se añadirá cuando estén definidos
+# package.json, los comandos de pruebas y las herramientas de CI.
+#
+# ESTADO:
+# Pendiente de configuración.

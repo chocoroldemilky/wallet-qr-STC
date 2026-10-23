@@ -1,0 +1,20 @@
+# Dependencias instaladas
+node_modules/
+
+# Archivos de configuración local
+.env
+.env.*
+
+# Excepción para mantener una plantilla sin secretos
+!.env.example
+
+# Registros
+*.log
+npm-debug.log*
+
+# Archivos temporales y del sistema
+.DS_Store
+Thumbs.db
+
+# Resultados de pruebas y cobertura
+coverage/
