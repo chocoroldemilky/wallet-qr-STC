@@ -17,3 +17,70 @@ Este archivo contendrá la estructura HTML de la interfaz.
 La lógica del QR y las operaciones criptográficas se implementarán
 en módulos JavaScript separados.
 -->
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wallet de Boletos - Prototipo Alfredo</title>
+  <!-- Enlace corregido -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <link rel="stylesheet" href="src/css/styles.css">
+</head>
+<body>
+
+<div class="app-container">
+  <header>Wallet de Boletos</header>
+
+  <div id="view-login">
+    <div class="login-icon">🎟️</div>
+    <h2 style="font-size: 1.2rem; margin-bottom: 5px;">Iniciar Sesión</h2>
+    <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 20px;">Accede a tus entradas para el evento</p>
+    
+    <div class="form-group">
+      <label>Correo electrónico</label>
+      <input type="email" value="alfredo@ejemplo.com" readonly>
+    </div>
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" value="********" readonly>
+    </div>
+    <button class="btn-primary" onclick="goToView('view-list')">Ingresar a mi Wallet</button>
+  </div>
+
+  <div id="view-list">
+    <h2 style="font-size: 0.95rem; margin-bottom: 12px; color: #94a3b8; text-transform: uppercase;">Mis Boletos Comprados</h2>
+    <div class="ticket-item">
+      <h3>Auditorio Nacional</h3>
+      <p>📅 15 de Noviembre, 2026</p>
+      <p>💺 Zona A - Fila 3, Asiento 12</p>
+      <button class="btn-primary" style="margin-top:10px; padding: 8px;" onclick="goToDetail()">Ver QR Dinámico</button>
+    </div>
+  </div>
+
+  <div id="view-detail">
+    <button class="btn-back" onclick="goToView('view-list')">← Volver</button>
+    <div style="clear: both;"></div>
+
+    <span class="badge">✓ Firma ECDSA Verificada</span>
+    <h2 style="margin-top:8px; font-size: 1.1rem;">Auditorio Nacional</h2>
+    <p style="color: #94a3b8; font-size: 0.85rem;">Zona A - Fila 3, Asiento 12</p>
+
+    <div class="qr-card">
+      <div id="qrcode"></div>
+    </div>
+
+    <div class="timer-container">
+      <p style="font-size: 0.85rem; color: #cbd5e1;">El QR cambia en: <strong id="timer-sec" style="color:#38bdf8;">15</strong>s</p>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="src/js/qr-dinamico.js"></script>
+
+</body>
+</html>
