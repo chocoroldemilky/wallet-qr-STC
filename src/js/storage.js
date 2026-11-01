@@ -16,6 +16,7 @@ Responsable: Francisco Omar Gutierrez Silva (Modulo 5)
 
 // Dexie: copia local en src/js/vendor (no requiere internet ni empaquetador).
 import Dexie from "./vendor/dexie.mjs";
+import { generateAESKey } from "./cripto.js";
 
 // ---------- Esquema de la base local ----------
 export const DB_NAME = "walletDB";
@@ -56,3 +57,50 @@ export function createDB(name = DB_NAME) {
 
 // Instancia unica que usa la aplicacion. Dexie abre la base en la primera operacion.
 export const db = createDB();
+
+// ---------- Clave AES local ----------
+/*
+La clave que cifra los boletos se genera una sola vez por navegador y se guarda en la tabla "keys"
+como CryptoKey NO extraible: el JavaScript de la pagina puede usarla para cifrar/descifrar, pero no
+puede leer ni exportar sus bytes.
+
+Limitaciones (documentar al equipo):
+- Protege contra lectura casual de IndexedDB, no contra codigo malicioso que corra en la misma pagina
+  (ese codigo podria usar la clave aunque no pueda extraerla).
+- Si el usuario borra los datos del sitio se pierden la clave y los boletos; habra que volver a
+  descargarlos del servidor.
+*/
+export const STORAGE_KEY_ID = "storage-aes";
+
+// Una promesa por base: evita generar dos claves si se llama varias veces al mismo tiempo.
+const keyCache = new WeakMap();
+
+export function getOrCreateStorageKey(database = db) {
+  if (!keyCache.has(database)) {
+    const pending = loadOrCreateKey(database).catch((err) => {
+      keyCache.delete(database); // permitir reintentar despues de un error
+      throw err;
+    });
+    keyCache.set(database, pending);
+  }
+  return keyCache.get(database);
+}
+
+async function loadOrCreateKey(database) {
+  const existing = await database.keys.get(STORAGE_KEY_ID);
+  if (existing) return existing.key;
+
+  // La clave se genera fuera de la transaccion: Dexie cierra la transaccion si se espera
+  // una operacion que no es de IndexedDB (como crypto.subtle).
+  const key = await generateAESKey(false);
+  try {
+    await database.keys.add({ id: STORAGE_KEY_ID, key, createdAt: Date.now() });
+    return key;
+  } catch (err) {
+    // Otra pestana la creo primero: usar la suya para que todas cifren con la misma clave.
+    if (err?.name === "ConstraintError") {
+      return (await database.keys.get(STORAGE_KEY_ID)).key;
+    }
+    throw err;
+  }
+}
