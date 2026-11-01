@@ -2,26 +2,24 @@
 OBJETIVO:
 Gestionar la persistencia local de los boletos y sus datos cifrados.
 
-RESPONSABILIDADES PREVISTAS:
-- Guardar y recuperar boletos cifrados.
-- Coordinar el uso de AES-GCM para proteger la informacion.
-- Gestionar errores de lectura, escritura y descifrado.
-- Evitar la persistencia innecesaria de informacion sensible.
+RESPONSABILIDADES:
+- Guardar y recuperar boletos cifrados con AES-GCM (IndexedDB con Dexie).
+- Generar y guardar la clave AES local.
+- Gestionar errores de lectura, escritura y descifrado (StorageError con codigo).
 
-DEPENDENCIAS:
-cripto.js (AES-GCM) y Dexie (copia local en src/js/vendor).
+CONSIDERACIONES DE SEGURIDAD:
+- Solo ticketId y status se guardan en claro; el resto del boleto va cifrado (incluye skSession y firma).
+- La clave AES es no extraible: se puede usar pero no leer.
+- El status local es informativo; la validacion final la hace el validador.
 
 Responsable: Francisco Omar Gutierrez Silva (Modulo 5)
 */
 
-// Dexie: copia local en src/js/vendor (no requiere internet ni empaquetador).
 import Dexie from "./vendor/dexie.mjs";
 import { generateAESKey, encryptTicket, decryptTicket, CryptoError, ERR as CRYPTO_ERR } from "./cripto.js";
 
-// ---------- Esquema de la base local ----------
 export const DB_NAME = "walletDB";
 
-// Estados posibles de un boleto (documento del proyecto, seccion 5).
 export const TICKET_STATUS = Object.freeze({
   ACTIVO: "ACTIVO",
   USADO: "USADO",
@@ -29,23 +27,9 @@ export const TICKET_STATUS = Object.freeze({
   PENDIENTE_SINCRO: "PENDIENTE_SINCRO",
 });
 
-/*
-Tabla "tickets": un registro por boleto.
-  ticketId        (clave primaria, SIN cifrar)  identificador del boleto
-  status          (indice, SIN cifrar)          uno de TICKET_STATUS
-  iv              (cifrado)                     IV de AES-GCM en base64url
-  ciphertext      (cifrado)                     boleto completo cifrado (incluye skSession y firma)
-  updatedAt       (indice)                      ms desde epoch de la ultima escritura local
-  last_synced_at                                ms desde epoch de la ultima sincronizacion con el servidor (o null)
-
-Tabla "keys": material criptografico local.
-  id   (clave primaria)  nombre de la clave, p. ej. "storage-aes"
-  key                    CryptoKey AES-GCM NO extraible (IndexedDB la guarda sin exponer sus bytes)
-
-En Dexie solo se declaran la clave primaria y los indices; el resto de campos se guarda igual.
-Solo ticketId y status quedan en claro (decision D3 de la bitacora). Si se agregan campos en claro
-(p. ej. nombre del evento y fecha), crear db.version(2) en lugar de modificar la version 1.
-*/
+// tickets: ticketId, status, iv, ciphertext, updatedAt, last_synced_at
+// keys: id, key (CryptoKey), createdAt
+// Si se agregan campos en claro, crear version(2) en lugar de cambiar la 1.
 export function createDB(name = DB_NAME) {
   const db = new Dexie(name);
   db.version(1).stores({
@@ -55,41 +39,33 @@ export function createDB(name = DB_NAME) {
   return db;
 }
 
-
-// Instancia unica que usa la aplicacion. Dexie abre la base en la primera operacion.
 export const db = createDB();
 
 // ---------- Errores ----------
-/*
-Todas las funciones publicas de este modulo fallan con StorageError, que tiene un "code" para que la
-interfaz decida que mensaje mostrar. El mensaje nunca incluye datos del boleto ni claves.
-"cause" conserva el error original (Dexie, Web Crypto) solo para depuracion.
-*/
 export const STORAGE_ERR = Object.freeze({
-  INVALID_INPUT: "INVALID_INPUT",       // boleto, ticketId o status con formato incorrecto
-  DB_UNAVAILABLE: "DB_UNAVAILABLE",     // IndexedDB no existe, esta bloqueada o no se pudo abrir
-  QUOTA_EXCEEDED: "QUOTA_EXCEEDED",     // el navegador no tiene espacio para guardar
-  DECRYPT_FAILED: "DECRYPT_FAILED",     // clave incorrecta o datos cifrados alterados
-  CORRUPTED: "CORRUPTED",               // registro o clave guardada con estructura invalida
-  OPERATION_FAILED: "OPERATION_FAILED", // cualquier otro fallo
+  INVALID_INPUT: "INVALID_INPUT",       // boleto, ticketId o status incorrecto
+  DB_UNAVAILABLE: "DB_UNAVAILABLE",     // IndexedDB no disponible
+  QUOTA_EXCEEDED: "QUOTA_EXCEEDED",     // sin espacio
+  DECRYPT_FAILED: "DECRYPT_FAILED",     // clave incorrecta o datos alterados
+  CORRUPTED: "CORRUPTED",               // registro o clave invalidos
+  OPERATION_FAILED: "OPERATION_FAILED",
 });
 
+// El mensaje nunca incluye datos del boleto ni claves.
 export class StorageError extends Error {
   constructor(code, message, { cause, ticketId } = {}) {
     super(message, cause ? { cause } : undefined);
     this.name = "StorageError";
     this.code = code;
-    if (ticketId !== undefined) this.ticketId = ticketId; // el ticketId no es secreto (va en claro)
+    if (ticketId !== undefined) this.ticketId = ticketId;
   }
 }
 
-// Nombres de error de Dexie / IndexedDB que significan "la base no se puede usar".
 const DB_UNAVAILABLE_NAMES = new Set([
   "MissingAPIError", "OpenFailedError", "DatabaseClosedError", "InvalidStateError",
   "VersionError", "UpgradeError", "SecurityError", "InvalidAccessError",
 ]);
 
-// Convierte cualquier error en StorageError.
 function toStorageError(err, ticketId) {
   if (err instanceof StorageError) return err;
   const opts = { cause: err, ticketId };
@@ -108,7 +84,7 @@ function toStorageError(err, ticketId) {
     }
   }
 
-  // Dexie envuelve el error nativo en "inner"; se revisan ambos nombres.
+  // Dexie guarda el error original en "inner"
   const names = [err?.name, err?.inner?.name];
   if (names.includes("QuotaExceededError")) {
     return new StorageError(STORAGE_ERR.QUOTA_EXCEEDED, "No hay espacio suficiente para guardar los boletos", opts);
@@ -119,7 +95,6 @@ function toStorageError(err, ticketId) {
   return new StorageError(STORAGE_ERR.OPERATION_FAILED, "Fallo una operacion de almacenamiento", opts);
 }
 
-// Ejecuta fn y convierte cualquier fallo en StorageError.
 async function guard(fn, ticketId) {
   try {
     return await fn();
@@ -128,10 +103,7 @@ async function guard(fn, ticketId) {
   }
 }
 
-/**
- * Abre la base y comprueba que IndexedDB funciona. Util al iniciar la app para avisar al usuario.
- * @throws {StorageError} DB_UNAVAILABLE si el navegador no permite usar IndexedDB
- */
+// Para comprobar al iniciar la app que se puede usar IndexedDB.
 export function openStorage(database = db) {
   return guard(async () => {
     await database.open();
@@ -140,26 +112,15 @@ export function openStorage(database = db) {
 }
 
 // ---------- Clave AES local ----------
-/*
-La clave que cifra los boletos se genera una sola vez por navegador y se guarda en la tabla "keys"
-como CryptoKey NO extraible: el JavaScript de la pagina puede usarla para cifrar/descifrar, pero no
-puede leer ni exportar sus bytes.
-
-Limitaciones (documentar al equipo):
-- Protege contra lectura casual de IndexedDB, no contra codigo malicioso que corra en la misma pagina
-  (ese codigo podria usar la clave aunque no pueda extraerla).
-- Si el usuario borra los datos del sitio se pierden la clave y los boletos; habra que volver a
-  descargarlos del servidor.
-*/
 export const STORAGE_KEY_ID = "storage-aes";
 
-// Una promesa por base: evita generar dos claves si se llama varias veces al mismo tiempo.
+// Evita generar dos claves si se llama varias veces al mismo tiempo.
 const keyCache = new WeakMap();
 
 export function getOrCreateStorageKey(database = db) {
   if (!keyCache.has(database)) {
     const pending = guard(() => loadOrCreateKey(database)).catch((err) => {
-      keyCache.delete(database); // permitir reintentar despues de un error
+      keyCache.delete(database); // permite reintentar
       throw err;
     });
     keyCache.set(database, pending);
@@ -179,14 +140,13 @@ async function loadOrCreateKey(database) {
   const existing = await database.keys.get(STORAGE_KEY_ID);
   if (existing) return assertStoredKey(existing);
 
-  // La clave se genera fuera de la transaccion: Dexie cierra la transaccion si se espera
-  // una operacion que no es de IndexedDB (como crypto.subtle).
+  // Se genera fuera de una transaccion: Dexie la cierra si se espera a crypto.subtle
   const key = await generateAESKey(false);
   try {
     await database.keys.add({ id: STORAGE_KEY_ID, key, createdAt: Date.now() });
     return key;
   } catch (err) {
-    // Otra pestana la creo primero: usar la suya para que todas cifren con la misma clave.
+    // otra pestana la guardo primero
     if (err?.name === "ConstraintError") {
       return assertStoredKey(await database.keys.get(STORAGE_KEY_ID));
     }
@@ -194,15 +154,8 @@ async function loadOrCreateKey(database) {
   }
 }
 
-// ---------- Operaciones con boletos ----------
-/*
-Formato de entrada: el boleto se guarda tal como llega del Modulo 4 (objeto JSON). Solo se exige
-"ticketId" (texto no vacio). Si no trae "status" se usa ACTIVO. Todo el objeto (evento, asiento,
-skSession, firma, etc.) se cifra con AES-GCM; en claro solo quedan ticketId y status.
-
-El status en claro es el que manda al leer (puede cambiar con updateTicketStatus sin volver a cifrar).
-Nota: el status local es informativo; la autorizacion final de acceso la decide el validador/servidor.
-*/
+// ---------- Boletos ----------
+// Se guarda el objeto tal como llega; solo se exige ticketId. Sin status se usa ACTIVO.
 
 function invalid(message) {
   return new StorageError(STORAGE_ERR.INVALID_INPUT, message);
@@ -220,7 +173,6 @@ function assertStatus(status) {
   }
 }
 
-// Valida el boleto antes de cifrarlo. Regresa el status que se guardara.
 function validateTicket(ticket) {
   if (!ticket || typeof ticket !== "object" || Array.isArray(ticket)) {
     throw invalid("El boleto debe ser un objeto");
@@ -231,7 +183,6 @@ function validateTicket(ticket) {
   return status;
 }
 
-// Construye el registro cifrado que se guarda en la tabla tickets.
 async function buildRecord(ticket, key, syncedAt) {
   const status = validateTicket(ticket);
   const { iv, ciphertext } = await encryptTicket(ticket, key);
@@ -245,8 +196,7 @@ async function buildRecord(ticket, key, syncedAt) {
   };
 }
 
-// Descifra un registro y comprueba que el contenido corresponde a ese ticketId
-// (evita que se intercambie el contenido cifrado entre dos boletos).
+// Tambien revisa que el contenido sea de ese ticketId (evita intercambiar cifrados entre boletos).
 async function openRecord(record, key) {
   const corrupted = (msg) => new StorageError(STORAGE_ERR.CORRUPTED, msg, { ticketId: record.ticketId });
   if (typeof record.iv !== "string" || typeof record.ciphertext !== "string") {
@@ -259,17 +209,10 @@ async function openRecord(record, key) {
   return { ...ticket, status: record.status };
 }
 
-/**
- * Guarda (o reemplaza) un boleto cifrado.
- * @param {object} ticket  boleto con al menos ticketId
- * @param {{ syncedAt?: number|null, database?: Dexie }} [options]
- *        syncedAt: momento de la sincronizacion con el servidor (ms); null si es solo local
- * @returns {Promise<{ticketId: string, status: string}>}
- * @throws {StorageError} INVALID_INPUT, QUOTA_EXCEEDED, DB_UNAVAILABLE, CORRUPTED, OPERATION_FAILED
- */
+// Guarda o reemplaza un boleto. syncedAt: fecha de sincronizacion con el servidor (ms) o null.
 export function saveTicket(ticket, { syncedAt = null, database = db } = {}) {
   return guard(async () => {
-    validateTicket(ticket); // falla rapido, antes de tocar la base
+    validateTicket(ticket);
     const key = await getOrCreateStorageKey(database);
     const record = await buildRecord(ticket, key, syncedAt);
     await database.tickets.put(record);
@@ -277,12 +220,7 @@ export function saveTicket(ticket, { syncedAt = null, database = db } = {}) {
   }, ticket?.ticketId);
 }
 
-/**
- * Guarda varios boletos (p. ej. la respuesta del Modulo 4) en una sola transaccion:
- * o se guardan todos o ninguno. Se cifran antes de abrir la transaccion.
- * @returns {Promise<number>} cantidad de boletos guardados
- * @throws {StorageError} igual que saveTicket; con INVALID_INPUT no se guarda ninguno
- */
+// Guarda varios boletos: se guardan todos o ninguno.
 export function saveTickets(tickets, { syncedAt = null, database = db } = {}) {
   return guard(async () => {
     if (!Array.isArray(tickets)) throw invalid("Se esperaba un arreglo de boletos");
@@ -294,11 +232,7 @@ export function saveTickets(tickets, { syncedAt = null, database = db } = {}) {
   });
 }
 
-/**
- * Recupera y descifra un boleto.
- * @returns {Promise<object|null>} el boleto completo, o null si no existe
- * @throws {StorageError} INVALID_INPUT, DECRYPT_FAILED, CORRUPTED, DB_UNAVAILABLE, OPERATION_FAILED
- */
+// Regresa el boleto descifrado o null si no existe.
 export function getTicket(ticketId, { database = db } = {}) {
   return guard(async () => {
     assertTicketId(ticketId);
@@ -309,14 +243,8 @@ export function getTicket(ticketId, { database = db } = {}) {
   }, ticketId);
 }
 
-/**
- * Lista los boletos guardados.
- * Por defecto NO descifra: regresa solo los datos en claro (rapido, para la vista de lista).
- * Con decrypt: true regresa los boletos completos. Un boleto danado no impide ver los demas:
- * en su lugar se regresa { ticketId, status, error: <codigo de STORAGE_ERR> }.
- * @param {{ status?: string, decrypt?: boolean, database?: Dexie }} [options]
- * @throws {StorageError} INVALID_INPUT, DB_UNAVAILABLE, CORRUPTED (clave), OPERATION_FAILED
- */
+// Sin decrypt solo regresa los datos en claro. Con decrypt, un boleto danado
+// viene como { ticketId, status, error } y no bloquea a los demas.
 export function listTickets({ status, decrypt = false, database = db } = {}) {
   return guard(async () => {
     let records;
@@ -337,11 +265,7 @@ export function listTickets({ status, decrypt = false, database = db } = {}) {
   });
 }
 
-/**
- * Cambia el estado de un boleto sin volver a cifrarlo.
- * @returns {Promise<boolean>} true si el boleto existia
- * @throws {StorageError} INVALID_INPUT, DB_UNAVAILABLE, OPERATION_FAILED
- */
+// Cambia el status sin volver a cifrar. Regresa false si no existe.
 export function updateTicketStatus(ticketId, status, { database = db } = {}) {
   return guard(async () => {
     assertTicketId(ticketId);
@@ -351,11 +275,7 @@ export function updateTicketStatus(ticketId, status, { database = db } = {}) {
   }, ticketId);
 }
 
-/**
- * Elimina un boleto.
- * @returns {Promise<boolean>} true si el boleto existia
- * @throws {StorageError} INVALID_INPUT, DB_UNAVAILABLE, OPERATION_FAILED
- */
+// Regresa false si no existe.
 export function deleteTicket(ticketId, { database = db } = {}) {
   return guard(async () => {
     assertTicketId(ticketId);

@@ -1,9 +1,5 @@
-// Pruebas de almacenamiento local cifrado (src/js/storage.js)
 // Ejecutar: npm run test:storage
-// IndexedDB se simula con fake-indexeddb; cada grupo usa una base distinta.
-// Responsable: Francisco Omar Gutierrez Silva (Modulo 5)
-
-import "fake-indexeddb/auto"; // debe importarse ANTES que storage.js
+import "fake-indexeddb/auto"; // IndexedDB simulada, antes de importar storage.js
 import * as S from "../../src/js/storage.js";
 import * as C from "../../src/js/cripto.js";
 
@@ -20,7 +16,6 @@ async function test(group, name, fn) {
   results.push({ group, name, pass, detail });
 }
 
-// Regresa el codigo del StorageError que lanza fn (o una descripcion si no es StorageError).
 async function codeOf(fn) {
   try { await fn(); return "sin error"; }
   catch (e) { return e instanceof S.StorageError ? e.code : `otro error: ${e?.name}`; }
@@ -30,23 +25,19 @@ let dbCount = 0;
 const newDB = () => S.createDB(`prueba-${++dbCount}`);
 const flip = (b64) => (b64[0] === "A" ? "B" : "A") + b64.slice(1);
 
-// --- Boletos de prueba (NO son datos reales) ---
-// Formato del mock de la rama apiRest
+// --- Boletos de prueba (formato del mock y del contrato de apiRest) ---
 const mockTicket = {
   ticketId: "BOL-001", event: "Concierto de prueba", date: "10/11/2026", seat: "A12",
   titular: "Usuario de prueba", skSession: "SK_SESSION_TEST_9988776654321",
   signatureECDSA: "MEYCIQDx...mock==", status: "ACTIVO",
 };
-// Formato del contrato provisional (docs/api.md de apiRest): sin status, con eventDetails
 const contractTicket = {
   ticketId: "BOL-002",
   eventDetails: { name: "Concierto de prueba", date: "10/11/2026", seat: "B3", holder: "Usuario de prueba" },
   skSession: "A1B2C3D4E5F67890123456789ABCDEF0", signatureECDSA: "3045...f42",
 };
 
-// =====================================================================
-// 1. Esquema
-// =====================================================================
+// ---------- Esquema ----------
 {
   const G = "Esquema";
   const db = newDB();
@@ -60,9 +51,7 @@ const contractTicket = {
   await test(G, "openStorage con IndexedDB disponible -> true", async () => (await S.openStorage(db)) === true);
 }
 
-// =====================================================================
-// 2. Clave AES local
-// =====================================================================
+// ---------- Clave AES local ----------
 {
   const G = "Clave AES";
   const db = newDB();
@@ -72,7 +61,7 @@ const contractTicket = {
   await test(G, "la segunda llamada reutiliza la misma clave", async () => (await S.getOrCreateStorageKey(db)) === k);
   await test(G, "solo se guarda una clave", async () => (await db.keys.count()) === 1);
 
-  // Recargar la pagina = nueva instancia sobre la misma base
+  // simula recargar la pagina
   db.close();
   const reopened = S.createDB(db.name);
   await test(G, "tras recargar, la clave guardada descifra lo cifrado antes", async () => {
@@ -81,7 +70,6 @@ const contractTicket = {
     return (await C.decryptTicket(rec, k2)).ticketId === "BOL-001";
   });
 
-  // Dos pestanas a la vez sobre una base nueva
   const name = `prueba-${++dbCount}`;
   const tabA = S.createDB(name), tabB = S.createDB(name);
   const [ka, kb] = await Promise.all([S.getOrCreateStorageKey(tabA), S.getOrCreateStorageKey(tabB)]);
@@ -97,9 +85,7 @@ const contractTicket = {
   });
 }
 
-// =====================================================================
-// 3. Guardar, consultar y recuperar
-// =====================================================================
+// ---------- Guardar, consultar y recuperar ----------
 {
   const G = "Operaciones";
   const database = newDB();
@@ -152,9 +138,7 @@ const contractTicket = {
   await test(G, "deleteTicket de un boleto inexistente -> false", async () => (await S.deleteTicket("BOL-003", o)) === false);
 }
 
-// =====================================================================
-// 4. Confidencialidad e integridad
-// =====================================================================
+// ---------- Confidencialidad e integridad ----------
 {
   const G = "Seguridad";
   const database = newDB();
@@ -196,9 +180,7 @@ const contractTicket = {
   });
 }
 
-// =====================================================================
-// 5. Manejo de errores
-// =====================================================================
+// ---------- Manejo de errores ----------
 {
   const G = "Errores";
   const database = newDB();
@@ -250,7 +232,7 @@ const contractTicket = {
     return (await codeOf(() => S.getOrCreateStorageKey(db))) === E.CORRUPTED;
   });
 
-  // Fallos del navegador simulados
+  // fallos del navegador simulados
   await test(G, "sin espacio (QuotaExceededError) -> QUOTA_EXCEEDED", async () => {
     const db = newDB();
     await S.getOrCreateStorageKey(db);

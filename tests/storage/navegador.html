@@ -19,7 +19,7 @@
 </head>
 <body>
   <h1>Prueba manual de storage.js</h1>
-  <p class="sub">Usa la IndexedDB real del navegador, en bases aparte (<code>walletDB-prueba…</code>) para no tocar la de la app. La prueba completa crea una base nueva en cada corrida.</p>
+  <p class="sub">Usa IndexedDB real en bases aparte (<code>walletDB-prueba…</code>).</p>
 
   <div class="botones">
     <button class="principal" id="todo">Ejecutar prueba completa</button>
@@ -50,7 +50,6 @@
     function check(cond, msg) { cond ? pass++ : fail++; log(`${cond ? "OK   " : "FALLO"} ${msg}`, cond ? "ok" : "fallo"); }
     async function codeOf(fn) { try { await fn(); return "sin error"; } catch (e) { return e.code ?? e.name; } }
 
-    // Boletos de prueba (NO son datos reales)
     const mock = { ticketId: "BOL-001", event: "Concierto de prueba", date: "10/11/2026", seat: "A12",
       titular: "Usuario de prueba", skSession: "SK_SESSION_TEST_9988776654321", signatureECDSA: "MEYCIQDx...mock==", status: "ACTIVO" };
     const contrato = { ticketId: "BOL-002", eventDetails: { name: "Festival de prueba", date: "20/11/2026", seat: "B3", holder: "Usuario de prueba" },
@@ -76,10 +75,10 @@
       const c = r.ciphertext;
       await database.tickets.put({ ...r, ciphertext: (c[0] === "A" ? "B" : "A") + c.slice(1) });
       log("Se cambió 1 carácter del ciphertext de BOL-001. Al leer: " + await codeOf(() => S.getTicket("BOL-001", o())));
-      await S.saveTicket(mock, o()); // restaurar
+      await S.saveTicket(mock, o());
       log("BOL-001 restaurado.");
     }
-    // Borra todas las bases de prueba (las que empiezan con walletDB-prueba). No toca walletDB.
+    // borra solo las bases de prueba
     async function borrar() {
       database.close();
       const names = (await indexedDB.databases()).map((d) => d.name).filter((n) => n?.startsWith(DB));
@@ -98,7 +97,6 @@
     async function todo() {
       logEl.textContent = ""; pass = 0; fail = 0;
       log(`Navegador: ${navigator.userAgent}`);
-      // Base nueva en cada corrida: asi la prueba empieza siempre desde cero
       database.close();
       database = S.createDB(`${DB}-${Date.now()}`);
       log(`Base de esta corrida: ${database.name}`);
@@ -126,7 +124,7 @@
       check((await codeOf(() => S.getTicket("BOL-001", o()))) === "DECRYPT_FAILED", "ciphertext alterado → DECRYPT_FAILED");
       await database.tickets.put(r);
 
-      // Simula recargar la página: nueva conexión a la misma base
+      // simula recargar la pagina
       const runName = database.name;
       database.close();
       database = S.createDB(runName);
@@ -144,7 +142,7 @@
     for (const [id, fn] of Object.entries({ todo, guardar, listar, leer, crudo, alterar, borrar })) {
       document.getElementById(id).addEventListener("click", run(fn));
     }
-    // navegador.html?auto ejecuta la prueba completa al abrir (util para correrla sin hacer clic)
+    // navegador.html?auto corre la prueba al abrir
     if (new URLSearchParams(location.search).has("auto")) run(todo)();
   </script>
 </body>
