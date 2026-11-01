@@ -1,4 +1,9 @@
 {
+  "name": "wallet-web",
+  "type": "module",
+  "scripts": {
+    "test:cripto": "node tests/cripto/test.mjs"
+  },
   "dependencies": {
     "dexie": "^4.4.7"
   }
