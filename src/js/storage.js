@@ -11,3 +11,6 @@ RESPONSABILIDADES PREVISTAS:
 DEPENDENCIAS:
 crypto.js y la estrategia de gestion de claves definida por el equipo.
 */
+
+// Dexie: copia local en src/js/vendor (no requiere internet ni empaquetador).
+import Dexie from "./vendor/dexie.mjs";
