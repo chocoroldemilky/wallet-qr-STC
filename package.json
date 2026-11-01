@@ -1,0 +1,7 @@
+{
+  "name": "wallet-web",
+  "type": "module",
+  "scripts": {
+    "test:cripto": "node tests/cripto/cripto.test.mjs"
+  }
+}
