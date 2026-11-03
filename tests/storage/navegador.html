@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prueba manual — storage.js</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 860px; margin: 1.5rem auto; padding: 0 1rem; color: #1d1d1f; }
+    h1 { font-size: 1.4rem; margin-bottom: .2rem; }
+    p.sub { color: #555; margin-top: 0; }
+    .botones { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+    button { padding: .5rem .8rem; border: 1px solid #1f4e79; background: #fff; color: #1f4e79; border-radius: 6px; cursor: pointer; font-size: .9rem; }
+    button.principal { background: #1f4e79; color: #fff; }
+    button:hover { filter: brightness(.95); }
+    #log { background: #f5f7fa; border: 1px solid #d0d7de; border-radius: 6px; padding: .8rem; min-height: 8rem;
+           font: .85rem/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+    .ok { color: #1a7f37; } .fallo { color: #cf222e; } .info { color: #555; }
+  </style>
+</head>
+<body>
+  <h1>Prueba manual de storage.js</h1>
+  <p class="sub">Usa IndexedDB real en bases aparte (<code>walletDB-prueba…</code>).</p>
+
+  <div class="botones">
+    <button class="principal" id="todo">Ejecutar prueba completa</button>
+    <button id="guardar">Guardar boletos de prueba</button>
+    <button id="listar">Listar (sin descifrar)</button>
+    <button id="leer">Leer BOL-001 (descifrado)</button>
+    <button id="crudo">Ver registro crudo en IndexedDB</button>
+    <button id="alterar">Alterar BOL-001 y leer</button>
+    <button id="borrar">Borrar base de prueba</button>
+  </div>
+  <div id="log"></div>
+
+  <script type="module">
+    import * as S from "../../src/js/storage.js";
+
+    const DB = "walletDB-prueba";
+    let database = S.createDB(DB);
+    const o = () => ({ database });
+    const logEl = document.getElementById("log");
+    let pass = 0, fail = 0;
+
+    function log(msg, cls = "info") {
+      const line = document.createElement("div");
+      line.className = cls;
+      line.textContent = msg;
+      logEl.appendChild(line);
+    }
+    function check(cond, msg) { cond ? pass++ : fail++; log(`${cond ? "OK   " : "FALLO"} ${msg}`, cond ? "ok" : "fallo"); }
+    async function codeOf(fn) { try { await fn(); return "sin error"; } catch (e) { return e.code ?? e.name; } }
+
+    const mock = { ticketId: "BOL-001", event: "Concierto de prueba", date: "10/11/2026", seat: "A12",
+      titular: "Usuario de prueba", skSession: "SK_SESSION_TEST_9988776654321", signatureECDSA: "MEYCIQDx...mock==", status: "ACTIVO" };
+    const contrato = { ticketId: "BOL-002", eventDetails: { name: "Festival de prueba", date: "20/11/2026", seat: "B3", holder: "Usuario de prueba" },
+      skSession: "A1B2C3D4E5F67890123456789ABCDEF0", signatureECDSA: "3045...f42" };
+
+    async function guardar() {
+      const n = await S.saveTickets([mock, contrato], { ...o(), syncedAt: Date.now() });
+      log(`Guardados ${n} boletos.`);
+    }
+    async function listar() {
+      log("listTickets(): " + JSON.stringify(await S.listTickets(o()), null, 2));
+    }
+    async function leer() {
+      log("getTicket('BOL-001'): " + JSON.stringify(await S.getTicket("BOL-001", o()), null, 2));
+    }
+    async function crudo() {
+      const r = await database.tickets.get("BOL-001");
+      log("Registro tal como está en IndexedDB: " + JSON.stringify(r, null, 2));
+    }
+    async function alterar() {
+      const r = await database.tickets.get("BOL-001");
+      if (!r) return log("Primero guarda los boletos.");
+      const c = r.ciphertext;
+      await database.tickets.put({ ...r, ciphertext: (c[0] === "A" ? "B" : "A") + c.slice(1) });
+      log("Se cambió 1 carácter del ciphertext de BOL-001. Al leer: " + await codeOf(() => S.getTicket("BOL-001", o())));
+      await S.saveTicket(mock, o());
+      log("BOL-001 restaurado.");
+    }
+    // borra solo las bases de prueba
+    async function borrar() {
+      database.close();
+      const names = (await indexedDB.databases()).map((d) => d.name).filter((n) => n?.startsWith(DB));
+      for (const name of names) {
+        await new Promise((resolve, reject) => {
+          const req = indexedDB.deleteDatabase(name);
+          req.onsuccess = resolve;
+          req.onerror = () => reject(req.error);
+          req.onblocked = () => log(`"${name}" está abierta en otra pestaña; ciérrala para terminar de borrarla.`);
+        });
+      }
+      database = S.createDB(DB);
+      log(`Bases de prueba borradas: ${names.length ? names.join(", ") : "ninguna"}.`);
+    }
+
+    async function todo() {
+      logEl.textContent = ""; pass = 0; fail = 0;
+      log(`Navegador: ${navigator.userAgent}`);
+      database.close();
+      database = S.createDB(`${DB}-${Date.now()}`);
+      log(`Base de esta corrida: ${database.name}`);
+
+      check(await S.openStorage(database), "IndexedDB disponible (openStorage)");
+      const key = await S.getOrCreateStorageKey(database);
+      check(key instanceof CryptoKey && key.algorithm.name === "AES-GCM" && !key.extractable, "clave AES-GCM no extraíble creada");
+
+      await guardar();
+      const lista = await S.listTickets(o());
+      check(lista.length === 2 && lista.every((t) => !("skSession" in t)), "listTickets sin descifrar: 2 boletos, sin datos sensibles");
+
+      const b1 = await S.getTicket("BOL-001", o());
+      check(b1.seat === "A12" && b1.skSession === mock.skSession, "getTicket descifra BOL-001 completo");
+      check((await S.getTicket("BOL-002", o())).eventDetails.seat === "B3", "getTicket descifra BOL-002 (objeto anidado)");
+
+      const raw = JSON.stringify(await database.tickets.toArray());
+      check(!["SK_SESSION", "A12", "Concierto", "Festival", "A1B2C3"].some((s) => raw.includes(s)), "en IndexedDB no hay datos sensibles en claro");
+
+      check(await S.updateTicketStatus("BOL-001", S.TICKET_STATUS.USADO, o()), "updateTicketStatus → USADO");
+      check((await S.listTickets({ ...o(), status: "USADO" })).length === 1, "listTickets filtra por status");
+
+      const r = await database.tickets.get("BOL-001");
+      await database.tickets.put({ ...r, ciphertext: (r.ciphertext[0] === "A" ? "B" : "A") + r.ciphertext.slice(1) });
+      check((await codeOf(() => S.getTicket("BOL-001", o()))) === "DECRYPT_FAILED", "ciphertext alterado → DECRYPT_FAILED");
+      await database.tickets.put(r);
+
+      // simula recargar la pagina
+      const runName = database.name;
+      database.close();
+      database = S.createDB(runName);
+      check((await S.getTicket("BOL-001", o()))?.skSession === mock.skSession, "tras reabrir la base, la clave guardada sigue descifrando");
+
+      check(await S.deleteTicket("BOL-002", o()), "deleteTicket BOL-002");
+      check((await S.getTicket("BOL-002", o())) === null, "BOL-002 ya no existe");
+      check((await codeOf(() => S.saveTicket({ seat: "x" }, o()))) === "INVALID_INPUT", "boleto sin ticketId → INVALID_INPUT");
+
+      log(`\n${pass}/${pass + fail} pruebas correctas`, fail ? "fallo" : "ok");
+      log(`Puedes revisar la base en DevTools (F12) → Application/Almacenamiento → IndexedDB → ${database.name}.`);
+    }
+
+    const run = (fn) => async () => { try { await fn(); } catch (e) { log(`Error: ${e.code ?? e.name} — ${e.message}`, "fallo"); } };
+    for (const [id, fn] of Object.entries({ todo, guardar, listar, leer, crudo, alterar, borrar })) {
+      document.getElementById(id).addEventListener("click", run(fn));
+    }
+    // navegador.html?auto corre la prueba al abrir
+    if (new URLSearchParams(location.search).has("auto")) run(todo)();
+  </script>
+</body>
+</html>

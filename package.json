@@ -1,0 +1,16 @@
+{
+  "name": "wallet-web",
+  "type": "module",
+  "scripts": {
+    "test:cripto": "node tests/cripto/test.mjs",
+    "test:storage": "node tests/storage/test.mjs",
+    "test:integracion": "node tests/integracion/test.mjs",
+    "test": "npm run test:cripto && npm run test:storage && npm run test:integracion"
+  },
+  "dependencies": {
+    "dexie": "^4.4.7"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "6.2.7"
+  }
+}
