@@ -14,34 +14,43 @@ DEPENDENCIAS:
 crypto.js y el Modulo 6.
 */
 
+let qrcodeInstance = null;
+let timerInterval = null;
 
-let qrcode = null;
-
-function goToView(viewId) {
-    document.getElementById('view-login').style.display = 'none';
-    document.getElementById('view-list').style.display = 'none';
-    document.getElementById('view-detail').style.display = 'none';
-    document.getElementById(viewId).style.display = 'block';
+function switchView(viewId) {
+  const views = ['view-login', 'view-list', 'view-detail'];
+  views.forEach(id => {
+    document.getElementById(id).style.display = (id === viewId) ? 'block' : 'none';
+  });
+  
+  if (viewId !== 'view-detail' && timerInterval) {
+    clearInterval(timerInterval);
+  }
 }
 
-function goToDetail() {
-    goToView('view-detail');
-    if (!qrcode) {
-        qrcode = new QRCode(document.getElementById("qrcode"), { width: 170, height: 170 });
-    }
-    updateQR();
+function initQR() {
+  if (!qrcodeInstance) {
+    qrcodeInstance = new QRCode(document.getElementById("qrcode"), { 
+      width: 160, 
+      height: 160 
+    });
+  }
+  updateDynamicQR();
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(updateDynamicQR, 1000);
 }
 
-function updateQR() {
-    const now = Math.floor(Date.now() / 1000);
-    const secondsLeft = 15 - (now % 15);
-    const timeBucket = Math.floor(now / 15);
+function updateDynamicQR() {
+  const now = Math.floor(Date.now() / 1000);
+  const secondsLeft = 15 - (now % 15);
+  const timeBucket = Math.floor(now / 15);
 
-    if (qrcode && document.getElementById('view-detail').style.display === 'block') {
-        qrcode.makeCode(`TCK-001|BUCKET-${timeBucket}|HMAC_SHA256_MOCK`);
-        document.getElementById('timer-sec').textContent = secondsLeft;
-        document.getElementById('progress-fill').style.width = `${(secondsLeft / 15) * 100}%`;
-    }
+  if (document.getElementById('view-detail').style.display === 'block') {
+    // Estructura incorporando el TicketID BOL-001 y datos de la sección 11.3
+    const payload = `TICKET:BOL-001|EVENT:Concierto_de_prueba|DATE:10/11/2026|SEAT:A12|USER:Usuario_de_prueba|BUCKET:${timeBucket}`;
+    qrcodeInstance.makeCode(payload);
+
+    document.getElementById('timer-sec').textContent = secondsLeft;
+    document.getElementById('progress-fill').style.width = `${(secondsLeft / 15) * 100}%`;
+  }
 }
-
-setInterval(updateQR, 1000);

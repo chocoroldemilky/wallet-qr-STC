@@ -8,184 +8,267 @@ CONTENIDO PREVISTO:
 */
 
 * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    font-family: 'Segoe UI', system-ui, sans-serif;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-    background-color: #0f172a;
-    color: #f8fafc;
-    padding: 20px 10px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
+  background-color: #0b0f19;
+  color: #f8fafc;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 10px;
 }
 
+/* Envolvente tipo Smartphone */
 .app-container {
-    width: 100%;
-    max-width: 380px;
-    background: #1e293b;
-    border-radius: 24px;
-    overflow: hidden;
-    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6);
-    border: 1px solid #334155;
+  width: 100%;
+  max-width: 380px;
+  height: 100%;
+  max-height: 720px;
+  background: #1e293b;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.7);
+  border: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
 }
 
 header {
-    background: #0284c7;
-    padding: 18px;
-    text-align: center;
-    font-weight: bold;
-    font-size: 1.1rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+  background: #0284c7;
+  padding: 20px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
 }
 
+.view-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+/* PANTALLA 1: LOGIN */
 #view-login {
-    padding: 30px 20px;
-    text-align: center;
+  text-align: center;
+  padding-top: 30px;
 }
 
 .login-icon {
-    font-size: 3rem;
-    margin-bottom: 10px;
+  font-size: 3.5rem;
+  margin-bottom: 12px;
+}
+
+#view-login h2 {
+  font-size: 1.15rem;
+  margin-bottom: 6px;
+}
+
+.subtitle {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-bottom: 24px;
 }
 
 .form-group {
-    margin-bottom: 15px;
-    text-align: left;
+  margin-bottom: 16px;
+  text-align: left;
 }
 
 .form-group label {
-    display: block;
-    font-size: 0.85rem;
-    color: #94a3b8;
-    margin-bottom: 5px;
+  display: block;
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin-bottom: 6px;
+  font-weight: 500;
 }
 
 .form-group input {
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid #475569;
-    background: #0f172a;
-    color: #fff;
-    font-size: 0.95rem;
+  width: 100%;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: #fff;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
 }
 
+.form-group input:focus {
+  border-color: #38bdf8;
+}
+
+/* BOTONES */
 .btn-primary {
-    width: 100%;
-    background: #0284c7;
-    color: white;
-    border: none;
-    padding: 12px;
-    border-radius: 8px;
-    font-weight: bold;
-    font-size: 1rem;
-    cursor: pointer;
+  width: 100%;
+  background: #0284c7;
+  color: white;
+  border: none;
+  padding: 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
 }
 
-#view-list {
-    padding: 20px;
-    display: none;
+.btn-primary:active {
+  transform: scale(0.98);
 }
 
-.ticket-item {
-    background: #334155;
-    border-radius: 12px;
-    padding: 15px;
-    margin-bottom: 15px;
-    border-left: 5px solid #10b981;
+.btn-primary:hover {
+  background: #0369a1;
 }
 
-.ticket-item h3 {
-    font-size: 1.05rem;
-    color: #38bdf8;
-}
-
-.ticket-item p {
-    font-size: 0.85rem;
-    color: #cbd5e1;
-    margin: 4px 0;
-}
-
-#view-detail {
-    padding: 20px;
-    text-align: center;
-    display: none;
-}
-
-.badge {
-    background: #064e3b;
-    color: #34d399;
-    padding: 5px 12px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: bold;
-    border: 1px solid #059669;
-}
-
-.qr-card {
-    background: white;
-    padding: 15px;
-    border-radius: 16px;
-    display: inline-block;
-    margin: 15px 0;
-    position: relative;
-    overflow: hidden;
-    box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
-}
-
-.qr-card::before {
-    content: '';
-    position: absolute;
-    top: -100%;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(to bottom, transparent, rgba(56, 189, 248, 0.4), transparent);
-    animation: scanAnimation 2s infinite linear;
-}
-
-@keyframes scanAnimation {
-    0% {
-        top: -100%;
-    }
-
-    100% {
-        top: 100%;
-    }
-}
-
-.timer-container {
-    margin-top: 5px;
-}
-
-.progress-bar {
-    background: #475569;
-    height: 8px;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-top: 6px;
-}
-
-.progress-fill {
-    background: #38bdf8;
-    height: 100%;
-    width: 100%;
-    transition: width 1s linear;
+.btn-ticket {
+  margin-top: 12px;
+  padding: 10px;
 }
 
 .btn-back {
-    background: transparent;
-    border: 1px solid #475569;
-    color: #94a3b8;
-    padding: 6px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    float: left;
-    margin-bottom: 10px;
+  background: transparent;
+  border: 1px solid #475569;
+  color: #94a3b8;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  float: left;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.btn-back:hover {
+  background: #334155;
+  color: #fff;
+}
+
+.clear-fix {
+  clear: both;
+}
+
+/* PANTALLA 2: MIS BOLETOS */
+.section-title {
+  font-size: 0.85rem;
+  margin-bottom: 14px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.ticket-item {
+  background: #334155;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 15px;
+  border-left: 5px solid #10b981;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.ticket-item h3 {
+  font-size: 1.05rem;
+  color: #38bdf8;
+  margin-bottom: 6px;
+}
+
+.ticket-item p {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  margin: 3px 0;
+}
+
+/* PANTALLA 3: DETALLE Y QR */
+#view-detail {
+  text-align: center;
+}
+
+.badge {
+  background: rgba(6, 78, 59, 0.8);
+  color: #34d399;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid #059669;
+  display: inline-block;
+  margin-bottom: 10px;
+}
+
+.ticket-title {
+  margin-top: 6px;
+  font-size: 1.05rem;
+}
+
+.ticket-info {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  margin-bottom: 5px;
+}
+
+/* Contenedor del QR con animación visual anticaptura */
+.qr-card {
+  background: white;
+  padding: 16px;
+  border-radius: 18px;
+  display: inline-block;
+  margin: 12px 0;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.qr-card::before {
+  content: '';
+  position: absolute;
+  top: -100%;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom, transparent, rgba(56, 189, 248, 0.35), transparent);
+  animation: scanAnimation 2.5s infinite linear;
+}
+
+@keyframes scanAnimation {
+  0% { top: -100%; }
+  100% { top: 100%; }
+}
+
+.timer-container {
+  margin-top: 8px;
+  background: rgba(15, 23, 42, 0.4);
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.timer-container p {
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+
+#timer-sec {
+  color: #38bdf8;
+}
+
+.progress-bar {
+  background: #334155;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.progress-fill {
+  background: #38bdf8;
+  height: 100%;
+  width: 100%;
+  transition: width 1s linear;
 }
