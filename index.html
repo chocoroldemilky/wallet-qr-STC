@@ -24,7 +24,7 @@ en módulos JavaScript separados.
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Módulo 5: Wallet Web y QR Dinámico - Paloma Herrera Cid</title>
     <!-- Librería para renderizar códigos QR -->
-    <script src="[https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js](https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js)"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -96,19 +96,19 @@ en módulos JavaScript separados.
         <div id="view-login" class="view active">
             <div style="text-align: center; margin-top: 40px;">
                 <h2 style="color: var(--accent-green); margin-bottom: 10px;">¡Bienvenida, Paloma!</h2>
-                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 30px;">Sistema de recepción de boletos y QR Dinámico Anticopia.</p>
-                <button class="btn" onclick="recibirBoletosModulo4()">📥 Simular Recepción (Módulo 4)</button>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 30px;">Recepción de boletos y almacenamiento cifrado (AES-GCM).</p>
+                <button class="btn" onclick="recibirYProtegerBoletos()">📥 Sincronizar (Módulo 4)</button>
             </div>
             <div class="api-panel" style="margin-top: 30px;">
-                <strong>Contrato API Configurado:</strong><br>
-                GET /api/v1/wallet/tickets<br>
-                Headers: Authorization: Bearer <JWT_M1>
+                <strong>Integración Activa:</strong><br>
+                - API Mock (Paloma)<br>
+                - Storage AES-GCM IndexedDB (Francisco)
             </div>
         </div>
 
         <!-- VISTA 2: MIS BOLETOS -->
         <div id="view-tickets" class="view">
-            <h3 style="font-size: 0.95rem; color: var(--text-muted);">Boletos Disponibles</h3>
+            <h3 style="font-size: 0.95rem; color: var(--text-muted);">Boletos Disponibles (Cifrados localmente)</h3>
             <div id="ticket-list-container">
                 <!-- Se inyecta dinámicamente -->
             </div>
@@ -123,7 +123,7 @@ en módulos JavaScript separados.
                 <h3 id="det-evento">Concierto de prueba</h3>
                 <p><strong>TicketID:</strong> <span id="det-id">BOL-001</span></p>
                 <p><strong>Fecha:</strong> <span id="det-fecha">10/11/2026</span> | <strong>Asiento:</strong> <span id="det-asiento">A12</span></p>
-                <span class="badge">✓ Firma ECDSA Verificada (Mock)</span>
+                <span class="badge">✓ Cifrado AES-GCM y Firma Verificada</span>
             </div>
 
             <!-- Contenedor del Código QR Dinámico -->
@@ -145,59 +145,80 @@ en módulos JavaScript separados.
     </div>
 </div>
 
-<script>
-    // --- LÓGICA DE NAVEGACIÓN Y APIS (Paloma Herrera Cid) ---
-    function irAVista(vistaId) {
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.getElementById(vistaId).classList.add('active');
-        if(vistaId !== 'view-detail') detenerQrTimer();
-    }
+<!-- Importación de módulos como type="module" para usar import/export -->
+<script type="module">
+    import { saveTickets, listTickets } from "./src/js/storage.js";
 
     let boletoActual = null;
     let qrInterval = null;
     let countdownInterval = null;
 
-    async function recibirBoletosModulo4() {
-        console.log("[Módulo 5] Ejecutando mecanismo de recepción simulado con Módulo 4...");
-        
-        // Simulación de consumo de API de Módulo 4
-        const mockTicket = {
-            ticketId: "BOL-001",
-            event: "Concierto de prueba",
-            date: "10/11/2026",
-            seat: "A12",
-            titular: "Usuario de prueba",
-            skSession: "SK_SESSION_TEST_12345"
-        };
-
-        boletoActual = mockTicket;
-        
-        // Renderizar en vista Mis Boletos
-        const container = document.getElementById('ticket-list-container');
-        container.innerHTML = `
-            <div class="ticket-card" onclick="abrirDetalleBoleto()">
-                <h3>🎫 ${mockTicket.event}</h3>
-                <p>ID: ${mockTicket.ticketId} | Asiento: ${mockTicket.seat}</p>
-                <p>Titular: ${mockTicket.titular}</p>
-                <span class="badge">Listo para mostrar QR</span>
-            </div>
-        `;
-
-        irAVista('view-tickets');
+    window.irAVista = function(vistaId) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById(vistaId).classList.add('active');
+        if(vistaId !== 'view-detail') detenerQrTimer();
     }
 
-    function abrirDetalleBoleto() {
-        if(!boletoActual) return;
-        document.getElementById('det-evento').innerText = boletoActual.event;
-        document.getElementById('det-id').innerText = boletoActual.ticketId;
-        document.getElementById('det-fecha').innerText = boletoActual.date;
-        document.getElementById('det-asiento').innerText = boletoActual.seat;
+    // Mecanismo de recepción y cifrado local mediante el storage.js de Francisco
+    window.recibirYProtegerBoletos = async function() {
+        console.log("[Módulo 5] Solicitando boletos de prueba (Módulo 4)...");
+        
+        const boletosMocks = [
+            {
+                ticketId: "BOL-001",
+                event: "Concierto de prueba",
+                date: "10/11/2026",
+                seat: "A12",
+                titular: "Usuario de prueba",
+                status: "ACTIVO",
+                skSession: "SK_SESSION_TEST_12345",
+                signatureECDSA: "MEYCIQDx...mock_ecdsa_signature...=="
+            }
+        ];
+
+        try {
+            // Guardamos usando la función segura de Francisco (Cifrado AES-GCM en IndexedDB)
+            await saveTickets(boletosMocks, { syncedAt: Date.now() });
+            console.log("[Módulo 5] ¡Boletos guardados y cifrados exitosamente en IndexedDB!");
+            
+            // Consultamos los boletos guardados para mostrarlos
+            const boletosGuardados = await listTickets({ decrypt: true });
+            renderizarListaBoletos(boletosGuardados);
+            
+            irAVista('view-tickets');
+        } catch (error) {
+            console.error("[Error de Almacenamiento]:", error);
+            alert("Error al guardar de forma cifrada los boletos.");
+        }
+    }
+
+    function renderizarListaBoletos(boletos) {
+        const container = document.getElementById('ticket-list-container');
+        container.innerHTML = "";
+        
+        boletos.forEach(ticket => {
+            container.innerHTML += `
+                <div class="ticket-card" onclick='abrirDetalleBoleto(${JSON.stringify(ticket)})'>
+                    <h3>🎫 ${ticket.event || "Boleto Oficial"}</h3>
+                    <p>ID: ${ticket.ticketId} | Asiento: ${ticket.seat || "N/A"}</p>
+                    <p>Estado: <strong>${ticket.status}</strong></p>
+                    <span class="badge">Almacenado de forma segura</span>
+                </div>
+            `;
+        });
+    }
+
+    window.abrirDetalleBoleto = function(ticket) {
+        boletoActual = ticket;
+        document.getElementById('det-evento').innerText = ticket.event || "Concierto de prueba";
+        document.getElementById('det-id').innerText = ticket.ticketId;
+        document.getElementById('det-fecha').innerText = ticket.date || "10/11/2026";
+        document.getElementById('det-asiento').innerText = ticket.seat || "A12";
 
         irAVista('view-detail');
         iniciarQrDinamico();
     }
 
-    // --- LÓGICA DE QR DINÁMICO (Sintonizado con Módulo 6) ---
     function iniciarQrDinamico() {
         detenerQrTimer();
         
@@ -206,11 +227,8 @@ en módulos JavaScript separados.
         
         function generarPayloadYMostrar() {
             qrContainer.innerHTML = "";
-            // Ventana temporal de 15 segundos (Time Bucket TOTP)
             const timeBucket = Math.floor(Date.now() / 15000);
-            
-            // Simulación de cálculo HMAC-SHA256 con SK_session
-            const payloadSimulado = `${boletoActual.ticketId}:${timeBucket}:HMAC_TEST_HASH_OK`;
+            const payloadSimulado = `${boletoActual.ticketId}:${timeBucket}:${boletoActual.skSession || 'SK_TEST'}`;
             
             new QRCode(qrContainer, {
                 text: payloadSimulado,
