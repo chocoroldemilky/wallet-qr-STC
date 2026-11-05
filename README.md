@@ -149,6 +149,25 @@ El desarrollo deberá considerar las siguientes medidas:
 - Considerar los riesgos de capturas, copias, reutilización y exposición de códigos QR.
 - No presentar la validación offline de una firma como garantía de que el boleto no ha sido utilizado previamente.
 
+## Ejecución local
+
+La aplicación usa módulos ES (`<script type="module">`) e IndexedDB, por lo que debe abrirse desde un servidor local y no con doble clic sobre `index.html`:
+
+```bash
+python -m http.server 5500
+```
+
+Después, abrir `http://127.0.0.1:5500/`. La librería `qrcode.js` se carga desde cdnjs, así que la primera carga necesita conexión.
+
+Mientras el Módulo 4 no esté integrado, `src/js/emisor-prueba.js` firma con ECDSA dos boletos de demostración y genera su SK_session la primera vez que se abre la wallet. Los boletos se guardan cifrados con AES-GCM en IndexedDB (`walletDB`); la wallet solo conserva la clave pública del emisor.
+
+Pruebas automatizadas (requieren Node.js 18 o superior):
+
+```bash
+npm install --ignore-scripts
+npm test
+```
+
 ## Estado del proyecto
 
 **Estado:** Prototipo en desarrollo.

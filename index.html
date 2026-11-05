@@ -17,3 +17,85 @@ Este archivo contendrá la estructura HTML de la interfaz.
 La lógica del QR y las operaciones criptográficas se implementarán
 en módulos JavaScript separados.
 -->
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Wallet Digital - Módulo 5</title>
+  <link rel="stylesheet" href="src/css/styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+<div class="app-container">
+  <header>Wallet Digital</header>
+
+  <div class="view-content">
+    <!-- PANTALLA 1: LOGIN -->
+    <div id="view-login">
+      <div class="login-icon">🎟️</div>
+      <h2>Iniciar Sesión</h2>
+      <p class="subtitle">Acceso seguro a tus entradas</p>
+      
+      <div class="form-group">
+        <label>Correo electrónico</label>
+        <input type="email" value="usuario.prueba@ejemplo.com" readonly>
+      </div>
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" value="********" readonly>
+      </div>
+      <button class="btn-primary" id="btn-login">Ingresar a mi Wallet</button>
+    </div>
+
+    <!-- PANTALLA 2: MIS BOLETOS -->
+    <div id="view-list" style="display: none;">
+      <h2 class="section-title">Mis Boletos Activos</h2>
+      <p class="status-msg" id="list-msg">Cargando boletos…</p>
+      <div id="ticket-list"></div>
+    </div>
+
+    <!-- Plantilla de cada boleto: app.js la llena con los boletos descifrados de IndexedDB -->
+    <template id="ticket-template">
+      <div class="ticket-item">
+        <h3 data-field="name"></h3>
+        <p>🆔 TicketID: <span data-field="ticketId"></span></p>
+        <p>👤 Titular: <span data-field="holder"></span></p>
+        <p>📅 Fecha: <span data-field="date"></span></p>
+        <p>💺 Asiento: <span data-field="seat"></span></p>
+        <button class="btn-primary btn-ticket">Mostrar QR Dinámico</button>
+      </div>
+    </template>
+
+    <!-- PANTALLA 3: DETALLE Y QR -->
+    <div id="view-detail" style="display: none;">
+      <button class="btn-back" id="btn-back">← Volver</button>
+      <div class="clear-fix"></div>
+
+      <span class="badge badge-pending" id="detail-badge">Verificando firma…</span>
+      <h2 class="ticket-title" id="detail-name"></h2>
+      <p class="ticket-info">TicketID: <span id="detail-id"></span></p>
+      <p class="ticket-info">Titular: <span id="detail-holder"></span></p>
+      <p class="ticket-info">Fecha: <span id="detail-date"></span> • Asiento: <span id="detail-seat"></span></p>
+      <p class="status-msg" id="detail-msg" hidden></p>
+
+      <div class="qr-card" id="qr-card" hidden>
+        <div id="qrcode"></div>
+      </div>
+
+      <div class="timer-container" id="timer-container" hidden>
+        <p>El QR se actualiza en: <strong id="timer-sec">15</strong>s</p>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modulos ES: abrir con un servidor local (no con file://) -->
+<script type="module" src="src/js/app.js"></script>
+</body>
+</html>

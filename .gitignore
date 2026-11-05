@@ -18,3 +18,5 @@ Thumbs.db
 
 # Resultados de pruebas y cobertura
 coverage/
+
+tests/cripto/boleto-firmado-prueba.json
